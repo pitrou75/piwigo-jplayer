@@ -3,7 +3,6 @@
 /// getID3() by James Heinrich <info@getid3.org>               //
 //  available at http://getid3.sourceforge.net                 //
 //            or http://www.getid3.org                         //
-//          also https://github.com/JamesHeinrich/getID3       //
 /////////////////////////////////////////////////////////////////
 // See readme.txt for more details                             //
 /////////////////////////////////////////////////////////////////
@@ -26,9 +25,9 @@ class getid3_id3v1 extends getid3_handler
 			return false;
 		}
 
-		$this->fseek(-256, SEEK_END);
-		$preid3v1 = $this->fread(128);
-		$id3v1tag = $this->fread(128);
+		fseek($this->getid3->fp, -256, SEEK_END);
+		$preid3v1 = fread($this->getid3->fp, 128);
+		$id3v1tag = fread($this->getid3->fp, 128);
 
 		if (substr($id3v1tag, 0, 3) == 'TAG') {
 
@@ -43,7 +42,7 @@ class getid3_id3v1 extends getid3_handler
 
 			// If second-last byte of comment field is null and last byte of comment field is non-null
 			// then this is ID3v1.1 and the comment field is 28 bytes long and the 30th byte is the track number
-			if (($id3v1tag{125} === "\x00") && ($id3v1tag{126} !== "\x00")) {
+			if (($id3v1tag[125] === "\x00") && ($id3v1tag[126] !== "\x00")) {
 				$ParsedID3v1['track']   = ord(substr($ParsedID3v1['comment'], 29,  1));
 				$ParsedID3v1['comment'] =     substr($ParsedID3v1['comment'],  0, 28);
 			}
@@ -60,26 +59,6 @@ class getid3_id3v1 extends getid3_handler
 			foreach ($ParsedID3v1 as $key => $value) {
 				$ParsedID3v1['comments'][$key][0] = $value;
 			}
-			// ID3v1 encoding detection hack START
-			// ID3v1 is defined as always using ISO-8859-1 encoding, but it is not uncommon to find files tagged with ID3v1 using Windows-1251 or other character sets
-			// Since ID3v1 has no concept of character sets there is no certain way to know we have the correct non-ISO-8859-1 character set, but we can guess
-			$ID3v1encoding = 'ISO-8859-1';
-			foreach ($ParsedID3v1['comments'] as $tag_key => $valuearray) {
-				foreach ($valuearray as $key => $value) {
-					if (preg_match('#^[\\x00-\\x40\\xA8\\B8\\x80-\\xFF]+$#', $value)) {
-						foreach (array('Windows-1251', 'KOI8-R') as $id3v1_bad_encoding) {
-							if (function_exists('mb_convert_encoding') && @mb_convert_encoding($value, $id3v1_bad_encoding, $id3v1_bad_encoding) === $value) {
-								$ID3v1encoding = $id3v1_bad_encoding;
-								break 3;
-							} elseif (function_exists('iconv') && @iconv($id3v1_bad_encoding, $id3v1_bad_encoding, $value) === $value) {
-								$ID3v1encoding = $id3v1_bad_encoding;
-								break 3;
-							}
-						}
-					}
-				}
-			}
-			// ID3v1 encoding detection hack END
 
 			// ID3v1 data is supposed to be padded with NULL characters, but some taggers pad with spaces
 			$GoodFormatID3v1tag = $this->GenerateID3v1Tag(
@@ -100,7 +79,6 @@ class getid3_id3v1 extends getid3_handler
 			$ParsedID3v1['tag_offset_start'] = $ParsedID3v1['tag_offset_end'] - 128;
 
 			$info['id3v1'] = $ParsedID3v1;
-			$info['id3v1']['encoding'] = $ID3v1encoding;
 		}
 
 		if (substr($preid3v1, 0, 3) == 'TAG') {
